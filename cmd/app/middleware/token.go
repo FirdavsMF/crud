@@ -5,16 +5,14 @@ import (
 	"errors"
 	"log"
 	"net/http"
+
 )
 
 const (
-	// MANAGER ...
 	MANAGER = "MANAGER"
-	// ADMIN ...
-	ADMIN = "ADMIN"
+	ADMIN   = "ADMIN"
 )
 
-// ErrNoAuthentication ...
 var ErrNoAuthentication = errors.New("No authentication")
 
 var authenticationContextKey = &contextKey{"authentication context"}
@@ -22,18 +20,14 @@ var authenticationContextKey = &contextKey{"authentication context"}
 type contextKey struct {
 	name string
 }
-
-//HasAnyRoleFunc ...
-type HasAnyRoleFunc func(ctx context.Context, roles ...string) bool
+//type HasAnyRoleFunc func(ctx context.Context, roles ...string) bool
 
 func (c *contextKey) String() string {
 	return c.name
 }
 
-// IDFunc ...
 type IDFunc func(ctx context.Context, token string) (int64, error)
 
-// Authenticate ...
 func Authenticate(idFunc IDFunc) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -41,7 +35,7 @@ func Authenticate(idFunc IDFunc) func(http.Handler) http.Handler {
 
 			id, err := idFunc(request.Context(), token)
 			if err != nil {
-				log.Print(err, "Authhhththth")
+				log.Print(err, "Not Authorization")
 				http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
@@ -54,7 +48,7 @@ func Authenticate(idFunc IDFunc) func(http.Handler) http.Handler {
 	}
 }
 
-// Authentication ...
+
 func Authentication(ctx context.Context) (int64, error) {
 	if value, ok := ctx.Value(authenticationContextKey).(int64); ok {
 		return value, nil

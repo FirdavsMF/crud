@@ -2,261 +2,239 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/FirdavsMF/crud/cmd/app/middleware"
-	"github.com/FirdavsMF/crud/pkg/types"
+	"github.com/FirdavsMF/crud/pkg/managers"
 	"github.com/gorilla/mux"
+
 )
 
-//ADMIN ...
 const ADMIN = "ADMIN"
 
 func (s *Server) handleManagerRegistration(w http.ResponseWriter, r *http.Request) {
-
 	id, err := middleware.Authentication(r.Context())
+
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
 
-	if !s.managerSvc.IsAdmin(r.Context(), id) {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
-		return
-	}
-
-	var regItem struct {
+	var registrationItem struct {
 		ID    int64    `json:"id"`
 		Name  string   `json:"name"`
 		Phone string   `json:"phone"`
 		Roles []string `json:"roles"`
 	}
 
-	err = json.NewDecoder(r.Body).Decode(&regItem)
-
+	err = json.NewDecoder(r.Body).Decode(&registrationItem)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusInternalServerError, err)
+		errWriter(w, http.StatusInternalServerError, err)
 		return
 	}
-	item := &types.Manager{
-		ID:    regItem.ID,
-		Name:  regItem.Name,
-		Phone: regItem.Phone,
+
+	Admin := s.managerSvc.IsAdmin(r.Context(),id)
+	if Admin != true {
+		errWriter(w, http.StatusInternalServerError, err)
+		return
 	}
 
-	for _, role := range regItem.Roles {
+	item := &managers.Manager{
+		ID:    registrationItem.ID,
+		Name:  registrationItem.Name,
+		Phone: registrationItem.Phone,
+	}
+
+	for _, role := range registrationItem.Roles {
 		if role == ADMIN {
 			item.IsAdmin = true
 			break
 		}
 	}
 
-	tkn, err := s.managerSvc.Create(r.Context(), item)
-
+	token, err := s.managerSvc.Create(r.Context(), item)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusInternalServerError, err)
+		errWriter(w, http.StatusInternalServerError, err)
 		return
 	}
-
-	respondJSON(w, map[string]interface{}{"token": tkn})
-
+	resJson(w, map[string]interface{}{"token": token})
 }
 
 func (s *Server) handleManagerGetToken(w http.ResponseWriter, r *http.Request) {
-
-	var manager *types.Manager
+	var manager *managers.Manager
 	err := json.NewDecoder(r.Body).Decode(&manager)
-
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusInternalServerError, err)
+		errWriter(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	tkn, err := s.managerSvc.Token(r.Context(), manager.Phone, manager.Password)
+	token, err := s.managerSvc.Token(r.Context(), manager.Phone, manager.Password)
 	if err != nil {
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
-	respondJSON(w, map[string]interface{}{"token": tkn})
 
+
+	resJson(w, map[string]interface{}{"token": token})
 }
 
 func (s *Server) handleManagerChangeProducts(w http.ResponseWriter, r *http.Request) {
 	id, err := middleware.Authentication(r.Context())
+
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
+
 	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
-	product := &types.Product{}
+
+	product := &managers.Product{}
 	err = json.NewDecoder(r.Body).Decode(&product)
-	fmt.Print(product)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusInternalServerError, err)
+		errWriter(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	product, err = s.managerSvc.SaveProduct(r.Context(), product)
+	product, err = s.managerSvc.SaveProduct(r.Context(),product)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusInternalServerError, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
 
-	respondJSON(w, product)
+	resJson(w, product)
 }
 
 func (s *Server) handleManagerMakeSales(w http.ResponseWriter, r *http.Request) {
 	id, err := middleware.Authentication(r.Context())
-	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
-		return
-	}
-	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
-		return
-	}
-	sale := &types.Sale{}
-	sale.ManagerID = id
-	err = json.NewDecoder(r.Body).Decode(&sale)
 
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusInternalServerError, err)
+		errWriter(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if id == 0 {
+		errWriter(w, http.StatusForbidden, err)
+		return
+	}
+
+	sale := &managers.Sale{}
+	sale.ManagerID = id
+	err = json.NewDecoder(r.Body).Decode(&sale)
+	if err != nil {
+		errWriter(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	sale, err = s.managerSvc.MakeSale(r.Context(), sale)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
 
-	respondJSON(w, sale)
-
+	resJson(w, sale)
 }
 
 func (s *Server) handleManagerGetSales(w http.ResponseWriter, r *http.Request) {
 	id, err := middleware.Authentication(r.Context())
+
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
+
 	total, err := s.managerSvc.GetSales(r.Context(), id)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
-
-	respondJSON(w, map[string]interface{}{"manager_id": id, "total": total})
-
+	resJson(w, map[string]interface{}{"manager_id": id, "total": total})
 }
 
 func (s *Server) handleManagerGetProducts(w http.ResponseWriter, r *http.Request) {
-
 	items, err := s.managerSvc.Products(r.Context())
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+	
 
-	respondJSON(w, items)
-
+	resJson(w, items)
 }
 
 func (s *Server) handleManagerRemoveProductByID(w http.ResponseWriter, r *http.Request) {
 	id, err := middleware.Authentication(r.Context())
+
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
 
 	idParam, ok := mux.Vars(r)["id"]
 	if !ok {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, errors.New("Missing id"))
-		return
-	}
-	productID, err := strconv.ParseInt(idParam, 10, 64)
-	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
-		return
-	}
-	err = s.managerSvc.RemoveProductByID(r.Context(), productID)
-	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
 
+	productID, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		errWriter(w, http.StatusBadRequest, err)
+		return
+	}
+
+	err = s.managerSvc.RemoveProductByID(r.Context(), productID)
+	if err != nil {
+		errWriter(w, http.StatusBadRequest, err)
+		return
+	}
 }
 
 func (s *Server) handleManagerRemoveCustomerByID(w http.ResponseWriter, r *http.Request) {
 	id, err := middleware.Authentication(r.Context())
+
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
 
 	idParam, ok := mux.Vars(r)["id"]
 	if !ok {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, errors.New("Missing id"))
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	customerID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	err = s.managerSvc.RemoveCustomerByID(r.Context(), customerID)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
 
@@ -264,56 +242,51 @@ func (s *Server) handleManagerRemoveCustomerByID(w http.ResponseWriter, r *http.
 
 func (s *Server) handleManagerGetCustomers(w http.ResponseWriter, r *http.Request) {
 	id, err := middleware.Authentication(r.Context())
+
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
 
 	items, err := s.managerSvc.Customers(r.Context())
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
 
-	respondJSON(w, items)
-
+	resJson(w, items)
 }
 
 func (s *Server) handleManagerChangeCustomer(w http.ResponseWriter, r *http.Request) {
 	id, err := middleware.Authentication(r.Context())
+
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
+
 	if id == 0 {
-		//call the function for an error response
-		errorWriter(w, http.StatusForbidden, err)
+		errWriter(w, http.StatusForbidden, err)
 		return
 	}
-	customer := &types.Customer{}
+	customer := &managers.Customer{}
 	err = json.NewDecoder(r.Body).Decode(&customer)
-	fmt.Println(customer)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusInternalServerError, err)
+		errWriter(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	customer, err = s.managerSvc.ChangeCustomer(r.Context(), customer)
 	if err != nil {
-		//call the function for an error response
-		errorWriter(w, http.StatusBadRequest, err)
+		errWriter(w, http.StatusBadRequest, err)
 		return
 	}
 
-	respondJSON(w, customer)
+	resJson(w, customer)
 
 }
